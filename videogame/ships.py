@@ -1,5 +1,6 @@
 """playership"""
 
+from math import pi
 import pygame
 from videogame import assets
 from videogame import rgbcolors
@@ -36,7 +37,8 @@ class ShipSprite(pygame.sprite.Sprite):
         super().__init__()
         self._ship_image = RectSurface(width = width, height = height, color = color, name = name)
         self._png_image = pygame.image.load(assets.get(image_path)).convert_alpha()
-        self.image = self._png_image
+        self.rotated_scaled_image = pygame.transform.rotozoom(self._png_image, 180, 1 / 6)
+        self.image = self.rotated_scaled_image
         self._start_position = position
         self._position = position
         self.rect = self.image.get_rect()
@@ -46,6 +48,8 @@ class ShipSprite(pygame.sprite.Sprite):
         self._width = width
         self._height = height
         self._color = color
+        self._name = name
+        self._initial_time = pygame.time.get_ticks()
         
     def switch_image(self, image_name):
         """Switch the ship image to a new image. (explosion, etc.)"""
