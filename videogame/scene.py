@@ -1,6 +1,10 @@
 """Scene objects for making games with PyGame."""
 
 import pygame
+from videogame import rgbcolors
+from videogame import assets
+from videogame.ships import ShipSprite
+from videogame.cannonball import CannonBallSprite
 
 # If you're interested in using abstract base classes, feel free to rewrite
 # these classes.
@@ -18,9 +22,7 @@ class Scene:
         self._screen = screen
         if not screen_flags:
             screen_flags = pygame.SCALED
-        self._background = pygame.Surface(
-            self._screen.get_size(), flags=screen_flags
-        )
+        self._background = pygame.Surface(self._screen.get_size(), flags = screen_flags)
         self._background.fill(background_color)
         self._frame_rate = 60
         self._is_valid = True
@@ -33,8 +35,6 @@ class Scene:
 
     def process_event(self, event):
         """Process a game event by the scene."""
-        # This should be commented out or removed since it generates a lot of noise.
-        # print(str(event))
         if event.type == pygame.QUIT:
             print("Good Bye!")
             self._is_valid = False
@@ -80,5 +80,80 @@ class PressAnyKeyToExitScene(Scene):
     def process_event(self, event):
         """Process game events."""
         super().process_event(event)
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.K_ESCAPE:
             self._is_valid = False
+
+class GalagaScene(PressAnyKeyToExitScene):
+    def __init__(self, screen):
+        super().__init__(
+            screen, rgbcolors.black, soundtrack = None
+        )
+    
+        self._screen = screen
+
+        (self.width, self.height) = self._screen.get_size()
+        self._player_ship = ShipSprite(
+            position = pygame.math.Vector2(self.width // 2, self.height - 50),
+            direction = pygame.math.Vector2(0, 0),
+            speed = 5,
+            width = 50,
+            height = 50,
+            color = rgbcolors.white,
+            name = "Player Ship"
+        )
+        self._sprites = pygame.sprite.Group(self._player_ship)
+        
+        self.last_fire_time = pygame.time.get_ticks()
+        
+    def draw(self):
+        """Draw the scene."""
+        super().draw()
+        self._screen.fill(rgbcolors.black)
+        self._sprites.update()
+        self._sprites.draw(self._screen)
+
+
+    def begin_scene(self):
+        """Begin the scene."""
+        super().start_scene()
+
+    def update_scene(self):
+        self.player_action()
+
+        # Move all cannonballs and remove those that are out of bounds
+        for sprite in self._sprites:
+            if isinstance(sprite, CannonBallSprite):
+                sprite.move_ip(sprite.velocity.x, sprite.velocity.y)
+                if sprite.rect.bottom < 0:
+                    self._sprites.remove(sprite)
+        return super().update_scene()
+    
+    def process_event(self, event):
+        return super().process_event(event)
+    
+    def player_action(self):
+        """Move the player ship in the given direction."""
+        button = pygame.key.get_pressed()
+        if button[pygame.K_LEFT] or button[pygame.K_a]:
+            if self._player_ship.rect.left > 0:
+                self._player_ship.move_ip(-self._player_ship.speed, 0)
+        elif button[pygame.K_RIGHT] or button[pygame.K_d]:
+            if self._player_ship.rect.right < self.width:
+                self._player_ship.move_ip(self._player_ship.speed, 0)
+        elif button[pygame.K_SPACE] or button[pygame.K_RETURN]:
+            self.player_fire()
+    def player_fire(self):
+        """Fire a cannonball from the player ship."""
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_fire_time > 500:  # Fire every 1.5 seconds
+            cannonball = CannonBallSprite(
+                position = self._player_ship.position + pygame.math.Vector2(0, -self._player_ship.height // 2),
+                direction = pygame.math.Vector2(0, -1),
+                speed = 10,
+                width = 5,
+                height = 10,
+                color = rgbcolors.black,
+                name = "Cannon Ball"
+            )
+            self.last_fire_time = pygame.time.get_ticks()
+            self._sprites.add(cannonball)
