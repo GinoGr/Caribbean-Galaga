@@ -1,8 +1,10 @@
 """Game objects to create PyGame based games."""
 
 import warnings
-
 import pygame
+from .scene import GalagaScene
+from .scenemanager import SceneManager
+from . import rgbcolors
 
 def display_info():
     """Print out information about the display driver and video information."""
@@ -49,3 +51,25 @@ class VideoGame:
 
 
 # pylint: enable=too-few-public-methods
+
+class Galaga(VideoGame):
+    """This class holds the game Galaga."""
+    def __init__(self):
+        super().__init__(window_title = "Gino's Galaga")
+        self._scene_manager = SceneManager(
+            [GalagaScene(self._screen)]
+        )
+
+    def run(self):
+        current_scene = self._scene_manager._scenes[0]
+        current_scene.begin_scene()
+        while current_scene.is_valid():
+            for event in pygame.event.get():
+                current_scene.process_event(event)
+            current_scene.update_scene()
+            current_scene.draw()
+            pygame.display.flip()
+            self._clock.tick(current_scene.frame_rate())
+        current_scene.end_scene()
+
+    pygame.quit()
