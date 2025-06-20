@@ -22,8 +22,9 @@ class Scene:
         self._screen = screen
         if not screen_flags:
             screen_flags = pygame.SCALED
-        self._background = pygame.Surface(self._screen.get_size(), flags = screen_flags)
-        self._background.fill(background_color)
+        #self._background = pygame.Surface(self._screen.get_size(), flags = screen_flags)
+        self._background = pygame.image.load(assets.get('background')).convert()
+        #self._background.fill(background_color)
         self._frame_rate = 60
         self._is_valid = True
         self._soundtrack = soundtrack
@@ -108,7 +109,7 @@ class GalagaScene(PressAnyKeyToExitScene):
     def draw(self):
         """Draw the scene."""
         super().draw()
-        self._screen.fill(rgbcolors.black)
+        #self._screen.fill(rgbcolors.black)
         self._sprites.update()
         self._sprites.draw(self._screen)
 
@@ -134,13 +135,19 @@ class GalagaScene(PressAnyKeyToExitScene):
     def player_action(self):
         """Move the player ship in the given direction."""
         button = pygame.key.get_pressed()
-        if button[pygame.K_LEFT] or button[pygame.K_a]:
+        if(
+            (button[pygame.K_LEFT] and button[pygame.K_RIGHT]) or 
+            (button[pygame.K_a] and button[pygame.K_d])
+        ):
+            #do nothing if bot left and right pressed
+            pass
+        elif button[pygame.K_LEFT] or button[pygame.K_a]:
             if self._player_ship.rect.left > 0:
                 self._player_ship.move_ip(-self._player_ship.speed, 0)
         elif button[pygame.K_RIGHT] or button[pygame.K_d]:
             if self._player_ship.rect.right < self.width:
                 self._player_ship.move_ip(self._player_ship.speed, 0)
-        elif button[pygame.K_SPACE] or button[pygame.K_RETURN]:
+        if button[pygame.K_SPACE] or button[pygame.K_RETURN]:
             self.player_fire()
     def player_fire(self):
         """Fire a cannonball from the player ship."""
@@ -150,10 +157,31 @@ class GalagaScene(PressAnyKeyToExitScene):
                 position = self._player_ship.position + pygame.math.Vector2(0, -self._player_ship.height // 2),
                 direction = pygame.math.Vector2(0, -1),
                 speed = 10,
-                width = 5,
-                height = 10,
+                radius = 10,
                 color = rgbcolors.black,
                 name = "Cannon Ball"
             )
             self.last_fire_time = pygame.time.get_ticks()
             self._sprites.add(cannonball)
+
+    def create_enemy(self):
+        """Create an enemy ship at a random position."""
+        enemy_ship = ShipSprite(
+            position = pygame.math.Vector2(100, 100),
+            direction = pygame.math.Vector2(1, 0),
+            speed = 3,
+            width = 50,
+            height = 50,
+            color = rgbcolors.red,
+            name = "enemyship"
+        )
+        self._sprites.add(enemy_ship)
+
+    def enemy_parametric_motion(self):
+        for sprite in self._sprites:
+            if isinstance(sprite, ShipSprite) and sprite.color == rgbcolors.red:
+                t = pygame.time.get_ticks() - sprite._initial_time
+                if t < 360:
+                    x = 3 * pygame.math.sin(t)
+                    y = 2 * pygame.math.cos(t)
+                sprite.move_ip(x, y)
