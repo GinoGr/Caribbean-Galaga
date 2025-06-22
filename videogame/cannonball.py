@@ -36,7 +36,7 @@ class CannonBallSprite(pygame.sprite.Sprite):
         super().__init__()
         self._cannon_ball_image = CannonBallSurface(radius, color, rgbcolors.black, name)
         self._png_image = pygame.image.load(assets.get(image_path)).convert_alpha()
-        self._scaled_image = pygame.transform.smoothscale(self._png_image, (25, 25))
+        self._scaled_image = pygame.transform.smoothscale(self._png_image, (radius, radius))
         self.image = self._scaled_image
         self._start_position = position
         self.rect = self.image.get_rect()
