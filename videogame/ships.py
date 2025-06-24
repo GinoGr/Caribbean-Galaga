@@ -35,7 +35,7 @@ class RectSurface(pygame.Surface):
 class ShipSprite(pygame.sprite.Sprite):
     def __init__(self, position, direction, speed, width, height, name = "None", image_path = 'playership', rotate_angle = False, scale_factor = 1, path = None, grid = None):
         super().__init__()
-        #self._ship_image = RectSurface(width = width, height = height, name = name)
+        self._ship_image = RectSurface(width = width, height = height, name = name)
         self._png_image = pygame.image.load(assets.get(image_path)).convert_alpha()
         self.rotated_scaled_image = pygame.transform.smoothscale(self._png_image, (width, height))
         if rotate_angle:
@@ -59,8 +59,8 @@ class ShipSprite(pygame.sprite.Sprite):
         if path:
             self._base_path = list(path)
 
-        self._fire_every = randint(5000, 60000)  # Fire every 5-60 seconds
-        self._rush_every = randint(5000, 45000)
+        self._fire_every = randint(20000, 60000)  # Fire every 5-60 seconds
+        self._rush_every = randint(30000, 80000)
         self.grid_spot = grid
         # Set the hitbox for the ship.
         self.hitbox = pygame.Rect(0, 0, int(self.rect.width * 0.2), int(self.rect.height * 0.7))
@@ -166,10 +166,16 @@ class ShipSprite(pygame.sprite.Sprite):
         
     def expload(self, image_name):
         """Switch the ship image to a new image. (explosion, etc.)"""
+        current_center = self.rect.center
+
         self._png_image = pygame.image.load(assets.get(image_name)).convert_alpha()
         self.image = self._png_image
         self.rect = self.image.get_rect()
-        self.rect.center = self._position
+
+        self.rect.center = current_center
+
+        self._is_exploading = True
+        self._expload_start_time = pygame.time.get_ticks()
 
     @property
     def last_fire_time(self):
@@ -219,9 +225,10 @@ class ShipSprite(pygame.sprite.Sprite):
 
     @position.setter
     def position(self, new_position):
-        if not isinstance(new_position, pygame.math.Vector2):
-            raise TypeError("new_position doesn't match self._position")
-        self.rect.center = new_position
+        if not self._is_exploading:
+            if not isinstance(new_position, pygame.math.Vector2):
+                raise TypeError("new_position doesn't match self._position")
+            self.rect.center = new_position
 
 
     @property
@@ -255,7 +262,8 @@ class ShipSprite(pygame.sprite.Sprite):
 
     def move_ip(self, x, y):
         """Move paddle in place"""
-        self.position += pygame.math.Vector2(x, y)
+        if not self._is_exploading:
+            self.position += pygame.math.Vector2(x, y)
 
     def __repr__(self):
         """BallSprite in string form."""
