@@ -122,6 +122,11 @@ class GalagaScene(PressAnyKeyToExitScene):
 
         self._grid_index = 0
 
+        self._score = 0
+        self._lives = 2
+        self._font = pygame.font.SysFont(None, 36)
+        self._paused = False
+
     def draw(self):
         """Draw the scene."""
         super().draw()
@@ -129,9 +134,20 @@ class GalagaScene(PressAnyKeyToExitScene):
         self._ship_sprites.draw(self._screen)
         self._player_cannonball_sprites.draw(self._screen)
         self._enemy_cannonball_sprites.draw(self._screen)
+        self.draw_scoreboard()
+        if self._paused:
+            paused_text = self._font.render("Respawning...", True, rgbcolors.red)
+            self._screen.blit(paused_text, (self.width // 2 - 80, self.height // 2))
 
         for pos in self._enemy_grid:
             pygame.draw.circle(self._screen, rgbcolors.red, (int(pos.x), int(pos.y)), 4)
+
+    def draw_scoreboard(self):
+        score_text = self._font.render(f"Score: {self._score}", True, rgbcolors.red)
+        lives_text = self._font.render(f"Lives: {self._lives}", True, rgbcolors.red)
+
+        self._screen.blit(score_text, (10, 10))
+        self._screen.blit(lives_text, (10, 50))
 
 
     def begin_scene(self):
@@ -139,12 +155,18 @@ class GalagaScene(PressAnyKeyToExitScene):
         super().start_scene()
 
     def update_scene(self):
+        if self._paused:
+            return
         delta_time = 1 / self._frame_rate
         self.player_action()
         self.enemy_fire()
         self._enemy_cannonball_sprites.update()
         self._player_cannonball_sprites.update()
+        current_time = pygame.time.get_ticks()
         for sprite in self._ship_sprites:
+            if getattr(sprite, '_is_exploading', False):
+                if current_time - sprite._expload_start_time >= 500:
+                    self._ship_sprites.remove(sprite)
             if sprite.name != "Player Ship" :
                 sprite.update_entry(delta_time)
                 sprite.update_rush(delta_time)
@@ -159,6 +181,10 @@ class GalagaScene(PressAnyKeyToExitScene):
         return super().update_scene()
     
     def process_event(self, event):
+        if event.type == pygame.USEREVENT + 1:
+            self.respawn_player()
+            self._paused = False
+            pygame.time.set_timer(pygame.USEREVENT + 1, 0)
         return super().process_event(event)
     
     def cannonball_movement(self):
@@ -175,10 +201,9 @@ class GalagaScene(PressAnyKeyToExitScene):
     def detect_collisions(self):
         """Detect collisions between player cannonballs and enemy ships."""
         for sprite in self._ship_sprites:
-            if sprite.name != "Player Ship":
-                # Check for collisions with player cannonballs
-                sprite.hitbox.center = sprite.rect.center
+            sprite.hitbox.center = sprite.rect.center
         for cannonball in self._player_cannonball_sprites:
+            # Check for collisions with player cannonballs
             hit_enemies = []
             for s in self._ship_sprites:
                 if s.name == "Player Ship":
@@ -188,22 +213,39 @@ class GalagaScene(PressAnyKeyToExitScene):
         
             if hit_enemies:
                 for enemy in hit_enemies:
+                    if enemy._state == "idle":
+                        self._score += 50
+                    else:
+                        self._score += 100
+
+                    if self._score // 10000 > (self._score - 100) // 10000:
+                        self._lives += 1
+
                     enemy.expload('explosion')
-                    self._ship_sprites.remove(enemy)
                     self._player_cannonball_sprites.remove(cannonball)
         
         for cannonball in self._enemy_cannonball_sprites:
                 if self._player_ship.hitbox.colliderect(cannonball.rect):
                     self._player_ship.expload('explosion')
-                    self._ship_sprites.remove(self._player_ship)
-                    self._enemy_cannonball_sprites.remove(cannonball)
+                    self._lives -= 1
+
+                    if self._lives <= 0:
+                        self._is_valid = False
+                    else:
+                        self._paused = True
+                        pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
 
         for enemy in self._ship_sprites:
                 if enemy.name != "Player Ship":
                     if self._player_ship.hitbox.colliderect(enemy.rect):
                         self._player_ship.expload('explosion')
-                        self._ship_sprites.remove(self._player_ship)
-                        self._ship_sprites.remove(enemy)
+                        enemy.expload('explosion')
+                        self._lives -= 1
+                        if self._lives <= 0:
+                            self._is_valid = False
+                        else:
+                            self._paused = True
+                            pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
 
     def player_action(self):
         """Move the player ship in the given direction."""
@@ -345,7 +387,19 @@ class GalagaScene(PressAnyKeyToExitScene):
                 self._ship_sprites.add(enemy)
                 self._grid_index += 1
 
-
+    def respawn_player(self):
+        self._player_ship = ShipSprite(
+            position = pygame.math.Vector2(self.width // 2, self.height - 50),
+            direction = pygame.math.Vector2(0, 0),
+            speed = 5,
+            width = 50,
+            height = 50,
+            name = "Player Ship",
+            rotate_angle = True,
+            scale_factor = 1 / 6
+        )
+        self._ship_sprites.add(self._player_ship)
+        self._player_ship.last_fire_time = pygame.time.get_ticks()
 
     def generate_enemy_grid(self):
         """Generate a grid of 8x4 positions and return as list of Vector2s."""
