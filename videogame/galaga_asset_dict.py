@@ -5,6 +5,7 @@ galaga_asset_dict = {
     'enemyship1': 'enemyship.png',
     'enemyship2': 'enemyship2.png',
     'enemyship3': 'enemyship3.png',
+    'enemyship4': 'enemyship4.png',
     'background': 'background.png',
     'cannon ball': 'cannon ball.png',
     'explosion': 'explosion.png',
