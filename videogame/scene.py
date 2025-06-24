@@ -85,12 +85,12 @@ class PressAnyKeyToExitScene(Scene):
             self._is_valid = False
 
 loop_path = [
-            (-50, 250),(-50, 200), (150, 200), (200, 250), (150, 350), (50, 250), (250, 150), (-50, 150)
+            (-50, 250),(-50, 250), (150, 200), (200, 250), (150, 300), (50, 250), (250, 150), (-50, 150)
         ]
 zig_zag_path = [
-            (-50, 250), (50, 200), (150, 250),
-            (250, 200), (350, 250), (450, 200), (550, 250), (650, 200),
-            (750, 250), (850, 200), (950, 250), (1050, 200), (1150, 250)
+            (250, -100), (250, -100), (450, 100),
+            (250, 200), (450, 300), (250, 400), (450, 500), (350, 300),
+            (350, 300), (250, -100)
         ]
 
 class GalagaScene(PressAnyKeyToExitScene):
@@ -141,17 +141,20 @@ class GalagaScene(PressAnyKeyToExitScene):
     def update_scene(self):
         delta_time = 1 / self._frame_rate
         self.player_action()
+        self.enemy_fire()
         self._enemy_cannonball_sprites.update()
         self._player_cannonball_sprites.update()
         for sprite in self._ship_sprites:
-            if sprite.name != "Player Ship" and hasattr(sprite, 'update_entry'):
+            if sprite.name != "Player Ship" :
                 sprite.update_entry(delta_time)
+                sprite.update_rush(delta_time)
         self._ship_sprites.update()
 
         self.cannonball_movement()
         self.detect_collisions()
     
         self.create_enemy_fleet()
+        self.enemy_rush()
         
         return super().update_scene()
     
@@ -172,9 +175,7 @@ class GalagaScene(PressAnyKeyToExitScene):
     def detect_collisions(self):
         """Detect collisions between player cannonballs and enemy ships."""
         for sprite in self._ship_sprites:
-            if sprite.name == "Player Ship":
-                continue
-            elif sprite.name == "enemyship":
+            if sprite.name != "Player Ship":
                 # Check for collisions with player cannonballs
                 sprite.hitbox.center = sprite.rect.center
         for cannonball in self._player_cannonball_sprites:
@@ -184,12 +185,25 @@ class GalagaScene(PressAnyKeyToExitScene):
                     continue
                 if s.hitbox.colliderect(cannonball.rect):
                     hit_enemies.append(s)
-
+        
             if hit_enemies:
                 for enemy in hit_enemies:
                     enemy.expload('explosion')
                     self._ship_sprites.remove(enemy)
                     self._player_cannonball_sprites.remove(cannonball)
+        
+        for cannonball in self._enemy_cannonball_sprites:
+                if self._player_ship.hitbox.colliderect(cannonball.rect):
+                    self._player_ship.expload('explosion')
+                    self._ship_sprites.remove(self._player_ship)
+                    self._enemy_cannonball_sprites.remove(cannonball)
+
+        for enemy in self._ship_sprites:
+                if enemy.name != "Player Ship":
+                    if self._player_ship.hitbox.colliderect(enemy.rect):
+                        self._player_ship.expload('explosion')
+                        self._ship_sprites.remove(self._player_ship)
+                        self._ship_sprites.remove(enemy)
 
     def player_action(self):
         """Move the player ship in the given direction."""
@@ -198,7 +212,7 @@ class GalagaScene(PressAnyKeyToExitScene):
             (button[pygame.K_LEFT] and button[pygame.K_RIGHT]) or 
             (button[pygame.K_a] and button[pygame.K_d])
         ):
-            #do nothing if bot left and right pressed
+            #do nothing if button left and right pressed
             pass
         elif button[pygame.K_LEFT] or button[pygame.K_a]:
             if self._player_ship.rect.left > 0:
@@ -208,11 +222,11 @@ class GalagaScene(PressAnyKeyToExitScene):
                 self._player_ship.move_ip(self._player_ship.speed, 0)
         if button[pygame.K_SPACE] or button[pygame.K_RETURN]:
             self.player_fire()
-   
+
     def player_fire(self):
         """Fire a cannonball from the player ship."""
         current_time = pygame.time.get_ticks()
-        if current_time - self._player_ship.last_fire_time > 250:  # Fire every 0.5 seconds
+        if current_time - self._player_ship.last_fire_time > 500:  # Fire every 0.5 seconds
             cannonball = CannonBallSprite(
                 position = self._player_ship.position + pygame.math.Vector2(0, -self._player_ship.height // 2),
                 direction = pygame.math.Vector2(0, -1),
@@ -224,9 +238,38 @@ class GalagaScene(PressAnyKeyToExitScene):
             self._player_ship.last_fire_time = pygame.time.get_ticks()
             self._player_cannonball_sprites.add(cannonball)
 
+    def enemy_fire(self):
+        """Fire a cannonball from the enemy ships."""
+        current_time = pygame.time.get_ticks()
+        for enemy in self._ship_sprites:
+            if(
+                enemy.name != "Player Ship" and 
+                current_time - enemy.last_fire_time > enemy.fire_every
+            ):
+                cannonball = CannonBallSprite(
+                    position = enemy.position + pygame.math.Vector2(0, enemy.height // 2),
+                    direction = pygame.math.Vector2(0, 1),
+                    speed = 10,
+                    radius = 10,
+                    color = rgbcolors.black,
+                    name = "Enemy Cannon Ball"
+                )
+                enemy.last_fire_time = pygame.time.get_ticks()
+                self._enemy_cannonball_sprites.add(cannonball)
+
+    def enemy_rush(self):
+        """Fire a cannonball from the enemy ships."""
+        current_time = pygame.time.get_ticks()
+        for enemy in self._ship_sprites:
+            if(
+                not enemy.name == "Player Ship" and 
+                current_time - enemy.last_time_rush > enemy.rush_every
+            ):
+                enemy.enable_rushing_path()
+
+                enemy.last_time_rush = pygame.time.get_ticks()
+
     def create_enemy_fleet(self):
-        #for i, pos in enumerate(self._enemy_grid[:8]):
-        
         if 9001 > pygame.time.get_ticks() > 5000:
             if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
                 self._last_enemy_spawn_time = pygame.time.get_ticks()
@@ -235,17 +278,16 @@ class GalagaScene(PressAnyKeyToExitScene):
                     direction = pygame.math.Vector2(0, 0),
                     speed = 0,
                     width = 200,
-                    height = 200,
+                    height = 150,
                     name = "enemyship",
                     image_path = "enemyship1",
-                    path = loop_path
+                    path = loop_path,
+                    grid = (self._enemy_grid[self._grid_index])
                 )
                 # Create path ending at grid spot
-                pos = (self._enemy_grid[self._grid_index])
-                enemy.set_final_position((pos.x, pos.y))
                 enemy.enable_entry_path()
                 self._ship_sprites.add(enemy)
-                self._grid_index += 1
+                self._grid_index = self._grid_index + 1
         elif 16001 > pygame.time.get_ticks() > 12000:
             if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
                 self._last_enemy_spawn_time = pygame.time.get_ticks()
@@ -254,15 +296,51 @@ class GalagaScene(PressAnyKeyToExitScene):
                     direction = pygame.math.Vector2(0, 0),
                     speed = 0,
                     width = 200,
-                    height = 200,
+                    height = 150,
                     name = "enemyship2",
                     image_path = "enemyship2",
-                    path = zig_zag_path
+                    path = zig_zag_path,
+                    grid = (self._enemy_grid[self._grid_index])
                 )
-                enemy.comes_from_left()
                 # Create path ending at grid spot
-                pos = (self._enemy_grid[self._grid_index])
-                enemy.set_final_position((pos.x, pos.y))
+                enemy.enable_entry_path()
+                self._ship_sprites.add(enemy)
+                self._grid_index += 1
+        elif 22001 > pygame.time.get_ticks() > 18000:
+            if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
+                self._last_enemy_spawn_time = pygame.time.get_ticks()
+                enemy = ShipSprite(
+                    position = pygame.math.Vector2(850, 250),
+                    direction = pygame.math.Vector2(0, 0),
+                    speed = 0,
+                    width = 200,
+                    height = 150,
+                    name = "enemyship3",
+                    image_path = "enemyship3",
+                    path = loop_path,
+                    grid = (self._enemy_grid[self._grid_index])
+                )
+                # Create path ending at grid spot
+                enemy.reverse_entry_direction()
+                enemy.enable_entry_path()
+                self._ship_sprites.add(enemy)
+                self._grid_index += 1
+        elif 32001 > pygame.time.get_ticks() > 28000:
+            if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
+                self._last_enemy_spawn_time = pygame.time.get_ticks()
+                enemy = ShipSprite(
+                    position = pygame.math.Vector2(850, 250),
+                    direction = pygame.math.Vector2(0, 0),
+                    speed = 0,
+                    width = 100,
+                    height = 100,
+                    name = "enemyship4",
+                    image_path = "enemyship4",
+                    path = zig_zag_path,
+                    grid = (self._enemy_grid[self._grid_index])
+                )
+                # Create path ending at grid spot
+                enemy.reverse_entry_direction()
                 enemy.enable_entry_path()
                 self._ship_sprites.add(enemy)
                 self._grid_index += 1
