@@ -5,16 +5,22 @@ import pygame
 from videogame import assets
 from videogame import rgbcolors
 
+
 class RectSurface(pygame.Surface):
     def __init__(
-     self, width, height, color = rgbcolors.white, background_color = rgbcolors.white, name = "None"       
+        self,
+        width,
+        height,
+        color=rgbcolors.white,
+        background_color=rgbcolors.white,
+        name="None",
     ):
         super().__init__((width, height))
         self._color = color
         self._name = name
         self.fill(background_color)
-        #uncomment if surfaces with same color will overlap
-        #self.set_colorkey(background_color)
+        # uncomment if surfaces with same color will overlap
+        # self.set_colorkey(background_color)
         self._rect_width = width
         self._rect_height = height
         rectangle = pygame.Rect(0, 0, self._rect_width, self._rect_height)
@@ -31,15 +37,34 @@ class RectSurface(pygame.Surface):
     @property
     def rect(self):
         return self.get_rect()
-    
+
+
 class ShipSprite(pygame.sprite.Sprite):
-    def __init__(self, position, direction, speed, width, height, name = "None", image_path = 'playership', rotate_angle = False, scale_factor = 1, path = None, grid = None):
+    def __init__(
+        self,
+        position,
+        direction,
+        speed,
+        width,
+        height,
+        name="None",
+        image_path="playership",
+        rotate_angle=False,
+        scale_factor=1,
+        path=None,
+        grid=None,
+        level=1,
+    ):
         super().__init__()
-        self._ship_image = RectSurface(width = width, height = height, name = name)
+        self._ship_image = RectSurface(width=width, height=height, name=name)
         self._png_image = pygame.image.load(assets.get(image_path)).convert_alpha()
-        self.rotated_scaled_image = pygame.transform.smoothscale(self._png_image, (width, height))
+        self.rotated_scaled_image = pygame.transform.smoothscale(
+            self._png_image, (width, height)
+        )
         if rotate_angle:
-            self.rotated_scaled_image = pygame.transform.rotozoom(self._png_image, 180, scale_factor)
+            self.rotated_scaled_image = pygame.transform.rotozoom(
+                self._png_image, 180, scale_factor
+            )
         self.image = self.rotated_scaled_image
         self._start_position = position
         self._position = position
@@ -58,24 +83,24 @@ class ShipSprite(pygame.sprite.Sprite):
         self._state = "Idle"
         if path:
             self._base_path = list(path)
-        self._fire_every = randint(self._initial_time + 20000, self._initial_time + 60000)  # Fire every 5-60 seconds
-        self._rush_every = randint(self._initial_time + 30000, self._initial_time + 80000)
+        self._level = level
+        self._fire_every = randint(10000, 45000 - (self._level * 1000))
+        self._rush_every = randint(15000, 60000 - (self._level * 1000))
         self.grid_spot = grid
         # Set the hitbox for the ship.
-        self.hitbox = pygame.Rect(0, 0, int(self.rect.width * 0.2), int(self.rect.height * 0.7))
+        self.hitbox = pygame.Rect(
+            0, 0, int(self.rect.width * 0.2), int(self.rect.height * 0.7)
+        )
         self.hitbox.center = self.rect.center
 
     @property
     def fire_every(self):
         return self._fire_every
-    
-    def reset_fire_every(self):
-        self._fire_every = randint(20000, 60000)
 
     @property
     def rush_every(self):
         return self._rush_every
-    
+
     def reverse_entry_direction(self):
         new_base_path = []
         for point in self._base_path:
@@ -87,12 +112,13 @@ class ShipSprite(pygame.sprite.Sprite):
         return self._base_path
 
     def enable_entry_path(self):
-        self._base_path[-2] = (self.grid_spot)
+        self._base_path[-2] = self.grid_spot
         self._entry_path = self._base_path
         self._entry_path_progress = 0.0
         self._state = "entering"
 
     def update_entry(self, delta_time):
+        entry_speed = min(0.5, 0.2 + self._level * 0.05)
         if self._state != "entering":
             return
         path = self._entry_path
@@ -100,10 +126,10 @@ class ShipSprite(pygame.sprite.Sprite):
         u = min(self._entry_path_progress, 0.9999) * segment
         i = int(u)
         dis = u - i
-        p0, p1, p2, p3 = path[i:i + 4]
+        p0, p1, p2, p3 = path[i : i + 4]
         self.rect.center = catmull_rom(p0, p1, p2, p3, dis)
         self.hitbox.center = self.rect.center
-        self._entry_path_progress += delta_time * 0.3
+        self._entry_path_progress += delta_time * entry_speed
         if self._entry_path_progress >= 1.0:
             self._state = "idle"
             self.position = pygame.math.Vector2(self.rect.center)
@@ -119,13 +145,13 @@ class ShipSprite(pygame.sprite.Sprite):
         self.rush_path.append((center_x, center_y))
         self.rush_path.append((center_x, center_y))
         for i in range(12):
-            if bottom_y  - self.height / 2 < 800:
+            if bottom_y - self.height / 2 < 800:
                 center_y += 80
-                center_x += (100 * direct)
+                center_x += 100 * direct
                 bottom_y += 80
             else:
                 center_y = -self.height / 2
-                center_x += (100 * direct)
+                center_x += 100 * direct
                 self.rush_path.append((-100, 900))
                 self.rush_path.append((-100, -100))
                 bottom_y = 0
@@ -134,6 +160,7 @@ class ShipSprite(pygame.sprite.Sprite):
         self.rush_path[-2] = self.grid_spot
 
     def update_rush(self, delta_time):
+        rush_speed = min(0.7, 0.3 + self._level * 0.05)
         if self._state != "rushing":
             return
         path = self.rush_path
@@ -141,19 +168,19 @@ class ShipSprite(pygame.sprite.Sprite):
         u = min(self._rushing_path_progress, 0.9999) * segment
         i = int(u)
         dis = u - i
-        p0, p1, p2, p3 = path[i:i + 4]
+        p0, p1, p2, p3 = path[i : i + 4]
         self.rect.center = catmull_rom(p0, p1, p2, p3, dis)
         self.hitbox.center = self.rect.center
-        self._rushing_path_progress += delta_time * 0.3
+        self._rushing_path_progress += delta_time * rush_speed
         if self._rushing_path_progress >= 1.0:
             self._state = "idle"
             self.position = pygame.math.Vector2(self.rect.center)
-        
+
     @property
     def hitbox(self):
         """Return the hitbox of the ship."""
         return self._hitbox
-    
+
     @hitbox.setter
     def hitbox(self, new_hitbox):
         """Set the hitbox of the ship."""
@@ -161,7 +188,7 @@ class ShipSprite(pygame.sprite.Sprite):
             raise TypeError("new_hitbox must be a pygame.Rect")
         self._hitbox = new_hitbox
         self._hitbox.center = self.rect.center
-        
+
     def expload(self, image_name):
         """Switch the ship image to a new image. (explosion, etc.)"""
         current_center = self.rect.center
@@ -179,7 +206,7 @@ class ShipSprite(pygame.sprite.Sprite):
     def last_fire_time(self):
         """Return the last fire time of the ship."""
         return self._last_fire_time
-    
+
     @last_fire_time.setter
     def last_fire_time(self, new_fire_time):
         """Set the last fire time of the ship."""
@@ -191,7 +218,7 @@ class ShipSprite(pygame.sprite.Sprite):
     def last_time_rush(self):
         """Return the last fire time of the ship."""
         return self._last_time_rush
-    
+
     @last_fire_time.setter
     def last_time_rush(self, new_time_rush):
         """Set the last fire time of the ship."""
@@ -227,7 +254,6 @@ class ShipSprite(pygame.sprite.Sprite):
             if not isinstance(new_position, pygame.math.Vector2):
                 raise TypeError("new_position doesn't match self._position")
             self.rect.center = new_position
-
 
     @property
     def direction(self):
@@ -269,10 +295,23 @@ class ShipSprite(pygame.sprite.Sprite):
         f"{repr(self.speed)}, {repr(self.width)}, {repr(self.height)}, "
         f'{repr(self._color)}, "{repr(self.position)}")'
         return stringify
-    
+
+
 def catmull_rom(p0, p1, p2, p3, t):
     t2, t3 = t * t, t * t * t
     return pygame.Vector2(
-        0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
-        0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+        0.5
+        * (
+            (2 * p1[0])
+            + (-p0[0] + p2[0]) * t
+            + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+            + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+        ),
+        0.5
+        * (
+            (2 * p1[1])
+            + (-p0[1] + p2[1]) * t
+            + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+            + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+        ),
     )

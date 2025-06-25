@@ -5,6 +5,7 @@ import pygame
 from .scene import GalagaScene, MenuScene, GameOverScene
 from .scenemanager import SceneManager
 
+
 def display_info():
     """Print out information about the display driver and video information."""
     print(f'The display is using the "{pygame.display.get_driver()}" driver.')
@@ -51,16 +52,17 @@ class VideoGame:
 
 # pylint: enable=too-few-public-methods
 
+
 class Galaga(VideoGame):
     """This class holds the game Galaga."""
+
     def __init__(self):
-        super().__init__(window_title = "Gino's Galaga")
-        self._scene_manager = SceneManager(
-            [MenuScene(self._screen)]
-        )
+        super().__init__(window_title="Gino's Galaga")
+        self._scene_manager = SceneManager([MenuScene(self._screen)])
         self._level = 1
 
     def run(self):
+        """Runs full galaga game"""
         current_scene = self._scene_manager._scenes[0]
 
         while current_scene.next_scene != "Quit":
@@ -77,7 +79,12 @@ class Galaga(VideoGame):
             current_scene.end_scene()
             match current_scene.next_scene:
                 case "Continue Game":
-                    current_scene = GalagaScene(self._screen, self._level, current_scene._score, current_scene._lives)
+                    current_scene = GalagaScene(
+                        self._screen,
+                        self._level,
+                        current_scene._score,
+                        current_scene._lives,
+                    )
                     self._level += 1
                 case "Menu":
                     current_scene = MenuScene(self._screen)

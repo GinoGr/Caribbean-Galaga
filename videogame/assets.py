@@ -34,9 +34,7 @@ def get(key):
     try:
         value = asset_dict[key]
     except KeyError:
-        print(
-            f'The asset key {key} is unknown and a KeyError exception was raised.'
-        )
+        print(f"The asset key {key} is unknown and a KeyError exception was raised.")
         raise
     value = path.join(data_dir, value)
     # Make sure the path exists
