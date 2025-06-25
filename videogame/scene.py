@@ -5,6 +5,7 @@ from videogame import rgbcolors
 from videogame import assets
 from videogame.ships import ShipSprite
 from videogame.cannonball import CannonBallSprite
+from videogame import highscores
 
 # If you're interested in using abstract base classes, feel free to rewrite
 # these classes.
@@ -16,7 +17,7 @@ class Scene:
     """Base class for making PyGame Scenes."""
 
     def __init__(
-        self, screen, background_color, screen_flags=None, soundtrack=None
+        self, screen, screen_flags=None, soundtrack=None
     ):
         """Scene initializer"""
         self._screen = screen
@@ -29,6 +30,11 @@ class Scene:
         self._is_valid = True
         self._soundtrack = soundtrack
         self._render_updates = None
+        self._next_scene = None
+
+    @property
+    def next_scene(self):
+        return self._next_scene
 
     def draw(self):
         """Draw the scene."""
@@ -93,8 +99,8 @@ zig_zag_path = [
             (350, 300), (250, -100)
         ]
 
-class GalagaScene(PressAnyKeyToExitScene):
-    def __init__(self, screen):
+class GalagaScene(Scene):
+    def __init__(self, screen, level = 1, score = 0, lives = 2):
         super().__init__(
             screen, rgbcolors.black, soundtrack = None
         )
@@ -117,15 +123,35 @@ class GalagaScene(PressAnyKeyToExitScene):
         self._enemy_cannonball_sprites = pygame.sprite.Group()
         self._player_ship.last_fire_time = pygame.time.get_ticks()
         self._last_enemy_spawn_time = pygame.time.get_ticks()
+        self._level_start = pygame.time.get_ticks()
 
         self._enemy_grid = self.generate_enemy_grid()
-
         self._grid_index = 0
+        self._wave_index = 0
+        self.wave_timer = pygame.time.get_ticks()
+        self._spawning_complete = False
 
-        self._score = 0
-        self._lives = 2
+        self._waves = [
+            ("enemyship1", loop_path, -50, 250, "normal"),
+            ("enemyship2", zig_zag_path, 850, 250, "normal"),
+            ("enemyship3", loop_path, 850, 250, "reverse"),
+            ("enemyship4", zig_zag_path, 850, 250, "reverse")
+        ]
+
+        self._score = score
+        self._lives = lives
         self._font = pygame.font.SysFont(None, 36)
         self._paused = False
+
+        self._level = level
+
+    @property
+    def score(self):
+        return self._score
+    
+    @property
+    def lives(self):
+        return self._lives
 
     def draw(self):
         """Draw the scene."""
@@ -145,10 +171,11 @@ class GalagaScene(PressAnyKeyToExitScene):
     def draw_scoreboard(self):
         score_text = self._font.render(f"Score: {self._score}", True, rgbcolors.red)
         lives_text = self._font.render(f"Lives: {self._lives}", True, rgbcolors.red)
+        level_text = self._font.render(f"Level: {self._level}", True, rgbcolors.red)
 
         self._screen.blit(score_text, (10, 10))
-        self._screen.blit(lives_text, (10, 50))
-
+        self._screen.blit(lives_text, (150, 10))
+        self._screen.blit(level_text, (250, 10))
 
     def begin_scene(self):
         """Begin the scene."""
@@ -177,6 +204,10 @@ class GalagaScene(PressAnyKeyToExitScene):
     
         self.create_enemy_fleet()
         self.enemy_rush()
+
+        if self.level_complete() and current_time  - self._level_start > 32000:
+            self._is_valid = False
+            self._next_scene = "Continue Game"
         
         return super().update_scene()
     
@@ -186,6 +217,22 @@ class GalagaScene(PressAnyKeyToExitScene):
             self._paused = False
             pygame.time.set_timer(pygame.USEREVENT + 1, 0)
         return super().process_event(event)
+    
+    def generate_enemy_grid(self):
+        """Generate a grid of 8x4 positions and return as list of Vector2s."""
+        cols = 8
+        rows = 4
+        spacing_x = 90
+        spacing_y = 120
+        top_margin = 75
+        left_margin = (self.width - (cols - 1) * spacing_x) // 2
+        grid = []
+        for row in range(rows):
+            for col in range(cols):
+                x = left_margin + col * spacing_x
+                y = top_margin + row * spacing_y
+                grid.append(pygame.Vector2(x, y))
+        return grid
     
     def cannonball_movement(self):
         for sprite in self._player_cannonball_sprites:
@@ -231,6 +278,7 @@ class GalagaScene(PressAnyKeyToExitScene):
 
                     if self._lives <= 0:
                         self._is_valid = False
+                        self._next_scene = "GameOver"
                     else:
                         self._paused = True
                         pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
@@ -243,6 +291,7 @@ class GalagaScene(PressAnyKeyToExitScene):
                         self._lives -= 1
                         if self._lives <= 0:
                             self._is_valid = False
+                            self._next_scene = "GameOver"
                         else:
                             self._paused = True
                             pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
@@ -280,6 +329,20 @@ class GalagaScene(PressAnyKeyToExitScene):
             self._player_ship.last_fire_time = pygame.time.get_ticks()
             self._player_cannonball_sprites.add(cannonball)
 
+    def respawn_player(self):
+        self._player_ship = ShipSprite(
+            position = pygame.math.Vector2(self.width // 2, self.height - 50),
+            direction = pygame.math.Vector2(0, 0),
+            speed = 5,
+            width = 50,
+            height = 50,
+            name = "Player Ship",
+            rotate_angle = True,
+            scale_factor = 1 / 6
+        )
+        self._ship_sprites.add(self._player_ship)
+        self._player_ship.last_fire_time = pygame.time.get_ticks()
+
     def enemy_fire(self):
         """Fire a cannonball from the enemy ships."""
         current_time = pygame.time.get_ticks()
@@ -312,107 +375,170 @@ class GalagaScene(PressAnyKeyToExitScene):
                 enemy.last_time_rush = pygame.time.get_ticks()
 
     def create_enemy_fleet(self):
-        if 9001 > pygame.time.get_ticks() > 5000:
-            if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
-                self._last_enemy_spawn_time = pygame.time.get_ticks()
-                enemy = ShipSprite(
-                    position = pygame.math.Vector2(-50, 250),
-                    direction = pygame.math.Vector2(0, 0),
-                    speed = 0,
-                    width = 200,
-                    height = 150,
-                    name = "enemyship",
-                    image_path = "enemyship1",
-                    path = loop_path,
-                    grid = (self._enemy_grid[self._grid_index])
-                )
-                # Create path ending at grid spot
-                enemy.enable_entry_path()
-                self._ship_sprites.add(enemy)
-                self._grid_index = self._grid_index + 1
-        elif 16001 > pygame.time.get_ticks() > 12000:
-            if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
-                self._last_enemy_spawn_time = pygame.time.get_ticks()
-                enemy = ShipSprite(
-                    position = pygame.math.Vector2(850, 250),
-                    direction = pygame.math.Vector2(0, 0),
-                    speed = 0,
-                    width = 200,
-                    height = 150,
-                    name = "enemyship2",
-                    image_path = "enemyship2",
-                    path = zig_zag_path,
-                    grid = (self._enemy_grid[self._grid_index])
-                )
-                # Create path ending at grid spot
-                enemy.enable_entry_path()
-                self._ship_sprites.add(enemy)
-                self._grid_index += 1
-        elif 22001 > pygame.time.get_ticks() > 18000:
-            if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
-                self._last_enemy_spawn_time = pygame.time.get_ticks()
-                enemy = ShipSprite(
-                    position = pygame.math.Vector2(850, 250),
-                    direction = pygame.math.Vector2(0, 0),
-                    speed = 0,
-                    width = 200,
-                    height = 150,
-                    name = "enemyship3",
-                    image_path = "enemyship3",
-                    path = loop_path,
-                    grid = (self._enemy_grid[self._grid_index])
-                )
-                # Create path ending at grid spot
-                enemy.reverse_entry_direction()
-                enemy.enable_entry_path()
-                self._ship_sprites.add(enemy)
-                self._grid_index += 1
-        elif 32001 > pygame.time.get_ticks() > 28000:
-            if pygame.time.get_ticks() - self._last_enemy_spawn_time > 500:
-                self._last_enemy_spawn_time = pygame.time.get_ticks()
-                enemy = ShipSprite(
-                    position = pygame.math.Vector2(850, 250),
-                    direction = pygame.math.Vector2(0, 0),
-                    speed = 0,
-                    width = 100,
-                    height = 100,
-                    name = "enemyship4",
-                    image_path = "enemyship4",
-                    path = zig_zag_path,
-                    grid = (self._enemy_grid[self._grid_index])
-                )
-                # Create path ending at grid spot
-                enemy.reverse_entry_direction()
-                enemy.enable_entry_path()
-                self._ship_sprites.add(enemy)
-                self._grid_index += 1
+        if self._wave_index >= len(self._waves):
+            self._spawning_complete = True
+            return
+        
+        current_time = pygame.time.get_ticks()
+        if current_time - self._last_enemy_spawn_time < 500:
+            return
+        
+        self._last_enemy_spawn_time = current_time
+        image, path, x, y, mode =  self._waves[self._wave_index]
 
-    def respawn_player(self):
-        self._player_ship = ShipSprite(
-            position = pygame.math.Vector2(self.width // 2, self.height - 50),
+        if self._grid_index >= len(self._enemy_grid):
+            self._spawning_complete = True
+            return
+        
+        enemy = ShipSprite(
+            position = pygame.math.Vector2(x, y),
             direction = pygame.math.Vector2(0, 0),
-            speed = 5,
-            width = 50,
-            height = 50,
-            name = "Player Ship",
-            rotate_angle = True,
-            scale_factor = 1 / 6
+            speed = 0,
+            width = 100  if "4" in image else 200,
+            height = 100 if "4" in image else 150,
+            name = image,
+            image_path = image,
+            path = path,
+            grid = self._enemy_grid[self._grid_index]
         )
-        self._ship_sprites.add(self._player_ship)
-        self._player_ship.last_fire_time = pygame.time.get_ticks()
+        if mode == "reverse":
+            enemy.reverse_entry_direction()
 
-    def generate_enemy_grid(self):
-        """Generate a grid of 8x4 positions and return as list of Vector2s."""
-        cols = 8
-        rows = 4
-        spacing_x = 90
-        spacing_y = 120
-        top_margin = 75
-        left_margin = (self.width - (cols - 1) * spacing_x) // 2
-        grid = []
-        for row in range(rows):
-            for col in range(cols):
-                x = left_margin + col * spacing_x
-                y = top_margin + row * spacing_y
-                grid.append(pygame.Vector2(x, y))
-        return grid
+        enemy.enable_entry_path()
+        self._ship_sprites.add(enemy)
+        self._grid_index += 1
+
+        if self._grid_index % 8 == 0:
+            self._wave_index += 1
+
+    def level_complete(self):
+        return all(sprite.name == "Player Ship" for sprite in self._ship_sprites)
+
+class MenuScene(Scene):
+    """Menu and rules are displayed here."""
+
+    def __init__(self, screen):
+        super().__init__(screen, rgbcolors.black)
+
+        self._screen = screen
+
+        (self.width, self.height) = self._screen.get_size()
+
+        self._score = 0
+        self._lives = 2
+
+    @property
+    def score(self):
+        return self._score
+    
+    @property
+    def lives(self):
+        return self._lives
+
+    def process_event(self, event):
+        """Catch is player wants to quit"""
+        super().process_event(event)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                pygame.quit()
+                exit()
+            self._is_valid = False
+            self._next_scene = "Continue Game"
+
+    def begin_scene(self):
+        """First step in new scene"""
+        self.start_scene()
+
+    def draw(self):
+        """Draw rules to menu screen"""
+        super().draw()
+        title_font = pygame.font.Font(None, 60)
+        subtitle_font = pygame.font.Font(None, 40)
+        text_font = pygame.font.Font(None, 30)
+
+        title_text = title_font.render("Galaga:", True, rgbcolors.white)
+        title_text_pos = title_text.get_rect(center = (self.width / 2, title_font.get_linesize() * 2))
+        self._background.blit(title_text, title_text_pos)
+
+        sub_title_text = subtitle_font.render("In The Caribbean", True, rgbcolors.white)
+        sub_title_text_pos = sub_title_text.get_rect(center = (self.width / 2, (title_font.get_linesize() * 2) + 50))
+        self._background.blit(sub_title_text, sub_title_text_pos)
+
+        rules_text = (
+            "Game Rules:\nUp Arrow/W: Move paddle up\nDown Arrow/S: move paddle down"
+        )
+
+        y_offset = 175
+        rules_text = "By Gino Grandin\n"
+        rules_text += "In this game, you are a pirate trying to kill the pursuing ships\n"
+        
+        rules_text += "Your goal in this game is to get to the highest score you can\n"
+        rules_text += "To get points, you must shoot the enemy ships\n"
+        rules_text += "Use 'a' or the left key to move left\n"
+        rules_text += "Use 'd' or the right key to move right\n"
+        rules_text += "Use the space or the enter key to shoot your ship's cannon\n"
+        rules_text += "The enemy ships will randomly shoot and rush you. Avoid both.\n"
+        rules_text += "Complete a level by sinking all enemy ships\n"
+        rules_text += "As levels progress, the game will get harder\n"
+        rules_text += "Try your best and have fun!"
+        rule_lines = rules_text.split("\n")
+        
+        font = pygame.font.Font(None, 30)
+        for line in rule_lines:
+            game_rules = font.render(line, True, rgbcolors.white)
+            game_rules_pos = game_rules.get_rect(center=(self.width / 2, y_offset))
+            self._background.blit(game_rules, game_rules_pos)
+            y_offset += font.get_linesize() * 2
+
+        y_offset += 100
+        rules_text = "Press any botton to continue or esc key to quit"
+
+        font = pygame.font.Font(None, 30)
+        game_rules = font.render(rules_text, True, rgbcolors.white)
+        game_rules_pos = game_rules.get_rect(center=(self.width / 2, y_offset))
+        self._background.blit(game_rules, game_rules_pos)
+        y_offset += font.get_linesize() * 2
+
+class GameOverScene(Scene):
+    def __init__(self, screen, score):
+        super().__init__(screen)
+        self._next_scene = "Menu"
+        self._score = score
+        self._font = pygame.font.Font(None, 50)
+        self._name = ""
+        self._entered = False
+
+    def begin_scene(self):
+        """First step in new scene"""
+        self.start_scene()
+
+    def process_event(self, event):
+        super().process_event(event)
+        if event.type == pygame.KEYDOWN:
+            if not self._entered:
+                if event.key == pygame.K_BACKSPACE:
+                    self._name = self._name[:-1]
+                elif event.key == pygame.K_RETURN and len(self._name) == 3:
+                    from videogame import highscores
+                    highscores.add_score(self._name.upper(), self._score)
+                    self._entered = True
+                elif len(self._name) < 3 and event.unicode.isalpha():
+                    self._name += event.unicode.upper()
+            else:
+                self._is_valid = False
+                self._next_scene = "Menu"
+
+
+    def draw(self):
+        super().draw()
+        if not self._entered:
+            msg = self._font.render(f"GAME OVER - SCORE: {self._score}", True, rgbcolors.white)
+            prompt = self._font.render(f"Enter 3-char Name: {self._name}", True, rgbcolors.red)
+            self._screen.blit(msg, (200, 200))
+            self._screen.blit(prompt, (200, 250))
+        else:
+            scores = highscores.load_highscores()
+            self._screen.blit(self._font.render("HIGH SCORES:", True, rgbcolors.white), (200, 200))
+            for i, (name, score) in enumerate(scores):
+                line = self._font.render(f"{i+1}. {name} - {score}", True, rgbcolors.red)
+                self._screen.blit(line, (200, 250 + i * 40))
