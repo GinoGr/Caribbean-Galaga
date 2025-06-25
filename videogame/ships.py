@@ -7,6 +7,7 @@ from videogame import rgbcolors
 
 
 class RectSurface(pygame.Surface):
+    """Create rectangular surface (not used)"""
     def __init__(
         self,
         width,
@@ -28,14 +29,17 @@ class RectSurface(pygame.Surface):
 
     @property
     def height(self):
+        """Return height"""
         return self._rect_height
 
     @property
     def width(self):
+        """Return width"""
         return self._rect_width
 
     @property
     def rect(self):
+        """Return rect surface"""
         return self.get_rect()
 
 
