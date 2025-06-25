@@ -58,9 +58,8 @@ class ShipSprite(pygame.sprite.Sprite):
         self._state = "Idle"
         if path:
             self._base_path = list(path)
-
-        self._fire_every = randint(20000, 60000)  # Fire every 5-60 seconds
-        self._rush_every = randint(30000, 80000)
+        self._fire_every = randint(self._initial_time + 20000, self._initial_time + 60000)  # Fire every 5-60 seconds
+        self._rush_every = randint(self._initial_time + 30000, self._initial_time + 80000)
         self.grid_spot = grid
         # Set the hitbox for the ship.
         self.hitbox = pygame.Rect(0, 0, int(self.rect.width * 0.2), int(self.rect.height * 0.7))
@@ -70,9 +69,8 @@ class ShipSprite(pygame.sprite.Sprite):
     def fire_every(self):
         return self._fire_every
     
-    @fire_every.setter
-    def fire_every(self):
-        self._fire_every = randint(5000, 60000)
+    def reset_fire_every(self):
+        self._fire_every = randint(20000, 60000)
 
     @property
     def rush_every(self):
