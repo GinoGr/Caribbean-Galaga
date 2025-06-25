@@ -2,9 +2,8 @@
 
 import warnings
 import pygame
-from .scene import GalagaScene
+from .scene import GalagaScene, MenuScene, GameOverScene
 from .scenemanager import SceneManager
-from . import rgbcolors
 
 def display_info():
     """Print out information about the display driver and video information."""
@@ -57,19 +56,34 @@ class Galaga(VideoGame):
     def __init__(self):
         super().__init__(window_title = "Gino's Galaga")
         self._scene_manager = SceneManager(
-            [GalagaScene(self._screen)]
+            [MenuScene(self._screen)]
         )
+        self._level = 1
 
     def run(self):
         current_scene = self._scene_manager._scenes[0]
-        current_scene.begin_scene()
-        while current_scene.is_valid():
-            for event in pygame.event.get():
-                current_scene.process_event(event)
-            current_scene.update_scene()
-            current_scene.draw()
-            pygame.display.flip()
-            self._clock.tick(current_scene.frame_rate())
-        current_scene.end_scene()
+
+        while current_scene.next_scene != "Quit":
+            current_scene.begin_scene()
+
+            while current_scene.is_valid():
+                for event in pygame.event.get():
+                    current_scene.process_event(event)
+                current_scene.update_scene()
+                current_scene.draw()
+                pygame.display.flip()
+                self._clock.tick(current_scene.frame_rate())
+
+            current_scene.end_scene()
+            match current_scene.next_scene:
+                case "Continue Game":
+                    current_scene = GalagaScene(self._screen, self._level, current_scene._score, current_scene._lives)
+                    self._level += 1
+                case "Menu":
+                    current_scene = MenuScene(self._screen)
+                case "GameOver":
+                    current_scene = GameOverScene(self._screen, current_scene.score)
+                case _:
+                    break
 
     pygame.quit()
