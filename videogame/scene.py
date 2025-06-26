@@ -62,8 +62,8 @@ class Scene:
         """Start the scene."""
         if self._soundtrack:
             try:
-                pygame.mixer.music.load(self._soundtrack)
-                pygame.mixer.music.set_volume(0.05)
+                pygame.mixer.music.load(assets.get(self._soundtrack))
+                pygame.mixer.music.set_volume(0.5)
             except pygame.error as pygame_error:
                 print("\n".join(pygame_error.args))
                 raise SystemExit("broken!!") from pygame_error
@@ -118,7 +118,7 @@ class GalagaScene(Scene):
     """Galaga Caribean Game Scene"""
 
     def __init__(self, screen, level=1, score=0, lives=2):
-        super().__init__(screen, rgbcolors.black, soundtrack=None)
+        super().__init__(screen, rgbcolors.black)
         """Initialize Game scene"""
         self._screen = screen
 
@@ -162,6 +162,18 @@ class GalagaScene(Scene):
 
         self._show_level_text = True
         self._level_text_start_time = self._level_start
+
+        self._player_death = pygame.mixer.Sound(assets.get("player_death"))
+        self._player_fire = pygame.mixer.Sound(assets.get("player_fire"))
+        self._stationary_enemy_fire = pygame.mixer.Sound(assets.get("stationary_enemy_fire"))
+        self._moving_enemy_fire = pygame.mixer.Sound(assets.get("moving_enemy_fire"))
+        self._enemy_death = pygame.mixer.Sound(assets.get("enemy_death"))
+
+        self._player_death.set_volume(0.8)
+        self._player_fire.set_volume(0.2)
+        self._stationary_enemy_fire.set_volume(0.5)
+        self._moving_enemy_fire.set_volume(0.5)
+        self._enemy_death.set_volume(0.5)
 
     @property
     def score(self):
@@ -287,8 +299,9 @@ class GalagaScene(Scene):
             for s in self._ship_sprites:
                 if s.name == "Player Ship":
                     continue
-                if s.hitbox.colliderect(cannonball.rect):
+                if not s._is_exploading and s.hitbox.colliderect(cannonball.rect):
                     hit_enemies.append(s)
+                    self._enemy_death.play()
 
             if hit_enemies:
                 for enemy in hit_enemies:
@@ -308,6 +321,8 @@ class GalagaScene(Scene):
                 self._player_ship.expload("explosion")
                 self._lives -= 1
 
+                self._player_death.play()
+
                 if self._lives <= 0:
                     self._is_valid = False
                     self._next_scene = "GameOver"
@@ -321,6 +336,9 @@ class GalagaScene(Scene):
                     self._player_ship.expload("explosion")
                     enemy.expload("explosion")
                     self._lives -= 1
+                    self._player_death.play()
+                    self._enemy_death.play()
+
                     if self._lives <= 0:
                         self._is_valid = False
                         self._next_scene = "GameOver"
@@ -360,6 +378,7 @@ class GalagaScene(Scene):
                 color=rgbcolors.black,
                 name="Player Cannon Ball",
             )
+            self._player_fire.play()
             self._player_ship.last_fire_time = pygame.time.get_ticks()
             self._player_cannonball_sprites.add(cannonball)
 
@@ -395,6 +414,10 @@ class GalagaScene(Scene):
                     color=rgbcolors.black,
                     name="Enemy Cannon Ball",
                 )
+                if enemy._state == "idle":
+                    self._stationary_enemy_fire.play()
+                else:
+                    self._moving_enemy_fire.play()
                 enemy.last_fire_time = pygame.time.get_ticks()
                 self._enemy_cannonball_sprites.add(cannonball)
 
@@ -467,7 +490,7 @@ class MenuScene(Scene):
         (self.width, self.height) = self._screen.get_size()
 
         self._score = 0
-        self._lives = 2
+        self._lives = 3
 
     @property
     def score(self):
@@ -551,6 +574,7 @@ class MenuScene(Scene):
 
 
 class GameOverScene(Scene):
+    """Game over scene where player can enter a name for high scores"""
     def __init__(self, screen, score):
         """Initalize game over/scoreboard scene"""
         super().__init__(screen)
@@ -604,3 +628,8 @@ class GameOverScene(Scene):
                     f"{i+1}. {name} - {score}", True, rgbcolors.red
                 )
                 self._screen.blit(line, (200, 250 + i * 40))
+
+    @property
+    def score(self):
+        """Return begining score"""
+        return self._score
