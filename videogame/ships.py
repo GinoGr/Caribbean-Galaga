@@ -44,6 +44,7 @@ class RectSurface(pygame.Surface):
 
 
 class ShipSprite(pygame.sprite.Sprite):
+    """A class to represent a ship in the game."""
     def __init__(
         self,
         position,
@@ -88,8 +89,8 @@ class ShipSprite(pygame.sprite.Sprite):
         if path:
             self._base_path = list(path)
         self._level = level
-        self._fire_every = randint(10000, 45000 - (self._level * 1000))
-        self._rush_every = randint(15000, 60000 - (self._level * 1000))
+        self._fire_every = randint(5000, 45000 - (self._level * 1000))
+        self._rush_every = randint(10000, 60000 - (self._level * 1000))
         self.grid_spot = grid
         # Set the hitbox for the ship.
         self.hitbox = pygame.Rect(
@@ -99,13 +100,16 @@ class ShipSprite(pygame.sprite.Sprite):
 
     @property
     def fire_every(self):
+        """Return the time between shots."""
         return self._fire_every
 
     @property
     def rush_every(self):
+        """Return the time between rushes."""
         return self._rush_every
 
     def reverse_entry_direction(self):
+        """Reverse the entry path direction."""
         new_base_path = []
         for point in self._base_path:
             new_base_path.append(((point[0] * -1) + 800, point[1]))
@@ -113,15 +117,18 @@ class ShipSprite(pygame.sprite.Sprite):
 
     @property
     def base_path(self):
+        """Return the base path of the ship."""
         return self._base_path
 
     def enable_entry_path(self):
+        """Enable the entry path for the ship."""
         self._base_path[-2] = self.grid_spot
         self._entry_path = self._base_path
         self._entry_path_progress = 0.0
         self._state = "entering"
 
     def update_entry(self, delta_time):
+        """Update the entry path of the ship."""
         entry_speed = min(0.5, 0.2 + self._level * 0.05)
         if self._state != "entering":
             return
@@ -139,6 +146,7 @@ class ShipSprite(pygame.sprite.Sprite):
             self.position = pygame.math.Vector2(self.rect.center)
 
     def enable_rushing_path(self):
+        """Enable the rushing path for the ship."""
         self.rush_path = []
         direct = 1
         self._rushing_path_progress = 0.0
@@ -164,6 +172,7 @@ class ShipSprite(pygame.sprite.Sprite):
         self.rush_path[-2] = self.grid_spot
 
     def update_rush(self, delta_time):
+        """Update the rushing path of the ship."""
         rush_speed = min(0.7, 0.3 + self._level * 0.05)
         if self._state != "rushing":
             return
@@ -220,15 +229,15 @@ class ShipSprite(pygame.sprite.Sprite):
 
     @property
     def last_time_rush(self):
-        """Return the last fire time of the ship."""
+        """Return the last time the ship rushed."""
         return self._last_time_rush
 
-    @last_fire_time.setter
+    @last_time_rush.setter
     def last_time_rush(self, new_time_rush):
-        """Set the last fire time of the ship."""
+        """Set the last time the ship rushed."""
         if not isinstance(new_time_rush, int):
-            raise TypeError("new_fire_time must be an integer")
-        self._last_fire_time = new_time_rush
+            raise TypeError("new_time_rush must be an integer")
+        self._last_time_rush = new_time_rush
 
     @property
     def name(self):
@@ -242,18 +251,22 @@ class ShipSprite(pygame.sprite.Sprite):
 
     @property
     def height(self):
+        """Return the height of the ship."""
         return self._height
 
     @property
     def width(self):
+        """Return the width of the ship."""
         return self._width
 
     @property
     def position(self):
+        """Return the position of the ship."""
         return pygame.math.Vector2(self.rect.center)
 
     @position.setter
     def position(self, new_position):
+        """Set the position of the ship."""
         if not self._is_exploading:
             if not isinstance(new_position, pygame.math.Vector2):
                 raise TypeError("new_position doesn't match self._position")
@@ -261,28 +274,34 @@ class ShipSprite(pygame.sprite.Sprite):
 
     @property
     def direction(self):
+        """Return the direction of the ship."""
         return self._direction
 
     @direction.setter
     def direction(self, new_direction):
+        """Set the direction of the ship."""
         if not isinstance(new_direction, type(self._direction)):
             raise TypeError("new_direction doesn't match self._direction")
         self._direction = new_direction
 
     @property
     def speed(self):
+        """Return the speed of the ship."""
         return self._speed
 
     @speed.setter
     def speed(self, new_speed):
+        """Set the speed of the ship."""
         self._speed = new_speed
 
     @property
     def velocity(self):
+        """Return the velocity of the ship."""
         return self._direction * self._speed
 
     @velocity.setter
     def velocity(self, new_velocity):
+        """Set the velocity of the ship."""
         if not isinstance(new_velocity, pygame.math.Vector2):
             raise TypeError("new_velocity doesn't match self.velocity()")
         self._speed = new_velocity.length()
@@ -302,6 +321,9 @@ class ShipSprite(pygame.sprite.Sprite):
 
 
 def catmull_rom(p0, p1, p2, p3, t):
+    """
+    Catmull-Rom spline interpolation.
+    """
     t2, t3 = t * t, t * t * t
     return pygame.Vector2(
         0.5
