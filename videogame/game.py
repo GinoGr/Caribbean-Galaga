@@ -2,6 +2,7 @@
 
 import warnings
 import pygame
+from videogame import assets
 from .scene import GalagaScene, MenuScene, GameOverScene
 from .scenemanager import SceneManager
 
@@ -61,6 +62,15 @@ class Galaga(VideoGame):
         self._scene_manager = SceneManager([MenuScene(self._screen)])
         self._level = 1
 
+        self._soundtrack = "galaga_soundtrack"
+        try:
+            pygame.mixer.music.load(assets.get(self._soundtrack))
+            pygame.mixer.music.set_volume(0.4)
+        except pygame.error as pygame_error:
+            print("\n".join(pygame_error.args))
+            raise SystemExit("broken!!") from pygame_error
+        pygame.mixer.music.play(loops=-1, fade_ms=500)
+
     def run(self):
         """Runs full galaga game"""
         current_scene = self._scene_manager._scenes[0]
@@ -82,12 +92,13 @@ class Galaga(VideoGame):
                     current_scene = GalagaScene(
                         self._screen,
                         self._level,
-                        current_scene._score,
-                        current_scene._lives,
+                        current_scene.score,
+                        current_scene.lives,
                     )
                     self._level += 1
                 case "Menu":
                     current_scene = MenuScene(self._screen)
+                    self._level = 1
                 case "GameOver":
                     current_scene = GameOverScene(self._screen, current_scene.score)
                 case _:
