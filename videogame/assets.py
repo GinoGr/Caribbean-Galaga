@@ -13,7 +13,6 @@ from .galaga_asset_dict import galaga_asset_dict as asset_dict
 # The absolute path of the current file's directory.
 main_dir = path.split(path.abspath(__file__))[0]
 # We'll join "data" to our main_dir and that's where we will store our game assets.
-# Not the best location but it is good enough for our needs in CPSC 386.
 data_dir = path.join(main_dir, "data")
 
 # Dictionary of game assets. It's up to the programmer to keep track of all these
