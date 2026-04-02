@@ -33,9 +33,9 @@ This project is a fast-paced 2D shooter where the player controls a ship to elim
 
 
 
-![Main Menu Screenshot](videogame/data/Main Menu Screenshot.png)
+![Main Menu Screenshot]("videogame\data\Main Menu Screenshot.png")
 
-![Gameplay Screenshot](videogame/data/In Game Screenshot.png)
+![Gameplay Screenshot]("videogame\data\In Game Screenshot.png")
 
 ---
 
